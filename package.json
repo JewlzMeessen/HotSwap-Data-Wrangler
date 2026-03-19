@@ -6,14 +6,13 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build": "electron-builder --mac --win"
+    "build:mac": "electron-builder --mac --publish never",
+    "build:win": "electron-builder --win --publish never",
+    "build": "electron-builder --mac --win --publish never"
   },
   "build": {
     "appId": "com.hotswap.app",
     "productName": "HotSwap",
-    "publish": null,
     "mac": {
       "category": "public.app-category.photography",
       "icon": "assets/icon.icns",
