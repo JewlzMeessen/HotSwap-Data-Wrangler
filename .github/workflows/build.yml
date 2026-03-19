@@ -1,0 +1,51 @@
+name: Build HotSwap
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Abhängigkeiten installieren
+        run: npm install
+
+      - name: Mac App bauen
+        run: npm run build:mac
+
+      - name: DMG hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: HotSwap-Mac
+          path: dist/*.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Abhängigkeiten installieren
+        run: npm install
+
+      - name: Windows App bauen
+        run: npm run build:win
+
+      - name: EXE hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: HotSwap-Windows
+          path: dist/*Setup*.exe

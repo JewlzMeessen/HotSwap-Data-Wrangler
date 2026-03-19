@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HotSwap</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0f14;
+      --surface:   #141720;
+      --border:    #1e2330;
+      --border2:   #252c3d;
+      --text:      #cdd6f4;
+      --muted:     #585d78;
+      --accent:    #89b4fa;
+      --green:     #a6e3a1;
+      --red:       #f38ba8;
+      --yellow:    #f9e2af;
+      --orange:    #fab387;
+      --teal:      #94e2d5;
+      --mono:      'IBM Plex Mono', monospace;
+      --sans:      'IBM Plex Sans', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── Layout ── */
+    .app {
+      display: grid;
+      grid-template-rows: 44px 1fr;
+      height: 100vh;
+    }
+
+    /* ── Titlebar ── */
+    .titlebar {
+      -webkit-app-region: drag;
+      display: flex;
+      align-items: center;
+      padding: 0 16px 0 80px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+    .titlebar-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .titlebar-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .titlebar-status {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      -webkit-app-region: no-drag;
+    }
+    .titlebar-status.active { color: var(--green); }
+
+    /* ── Main Content ── */
+    .content {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 20px 16px;
+      gap: 24px;
+    }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── Cards (Volumes) ── */
+    .volumes-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .volume-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .volume-card:hover { border-color: var(--border2); background: #141a24; }
+    .volume-card.selected { border-color: var(--accent); background: rgba(137,180,250,0.05); }
+    .volume-card.new-pulse { animation: pulse-border 0.8s ease 3; }
+
+    @keyframes pulse-border {
+      0%, 100% { border-color: var(--border); }
+      50% { border-color: var(--green); box-shadow: 0 0 12px rgba(166,227,161,0.2); }
+    }
+
+    .vol-icon {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .vol-info { flex: 1; min-width: 0; }
+    .vol-name {
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .vol-path {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .vol-check {
+      color: var(--green);
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .empty-volumes {
+      text-align: center;
+      padding: 20px 0;
+      color: var(--muted);
+      font-size: 11px;
+      font-family: var(--mono);
+    }
+    .empty-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.4; }
+
+    /* ── Destination ── */
+    .dest-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .dest-box:hover { border-color: var(--border2); }
+    .dest-box.set { border-color: var(--teal); }
+    .dest-path {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--teal);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+    .dest-placeholder { color: var(--muted); font-size: 11px; flex: 1; }
+
+    /* ── Auto-Mode Toggle ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .toggle-label { font-size: 12px; color: var(--text); }
+    .toggle-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .toggle {
+      width: 36px; height: 20px;
+      background: var(--border2);
+      border-radius: 10px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.2s;
+    }
+    .toggle.on::after { transform: translateX(16px); }
+
+    /* ── Main Panel ── */
+    .main-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Status Bar ── */
+    .status-bar {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .big-status {
+      display: flex;
+      flex-direction: column;
+    }
+    .big-status-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .big-status-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .big-status-value.green { color: var(--green); }
+    .big-status-value.blue { color: var(--accent); }
+    .big-status-value.yellow { color: var(--yellow); }
+
+    .status-divider {
+      width: 1px; height: 32px;
+      background: var(--border);
+    }
+
+    .btn-primary {
+      margin-left: auto;
+      background: var(--accent);
+      color: #0d0f14;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 20px;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      letter-spacing: 0.02em;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-family: var(--sans);
+      font-size: 11px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    .btn-cancel {
+      background: transparent;
+      color: var(--red);
+      border: 1px solid var(--red);
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-cancel:hover { background: rgba(243,139,168,0.1); }
+
+    /* ── Progress Area ── */
+    .progress-area {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .progress-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .progress-filename {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      max-width: 60%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .progress-pct {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .progress-bar-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.1s;
+      width: 0%;
+    }
+    .progress-bar-fill.done { background: var(--green); }
+
+    .progress-sub {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* ── Log ── */
+    .log-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 4px 0;
+      border-bottom: 1px solid transparent;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .log-time {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .log-icon { flex-shrink: 0; font-size: 13px; line-height: 1.4; }
+    .log-text { font-size: 12px; color: var(--text); }
+    .log-text.muted { color: var(--muted); }
+    .log-text.green { color: var(--green); }
+    .log-text.blue { color: var(--accent); }
+    .log-text.yellow { color: var(--yellow); }
+    .log-text.red { color: var(--red); }
+
+    /* ── Result Panel ── */
+    .result-panel {
+      margin: 16px 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .result-panel.show { display: flex; animation: fadeIn 0.4s ease; }
+
+    .result-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .result-key { font-size: 11px; color: var(--muted); }
+    .result-val {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text);
+    }
+    .result-val.green { color: var(--green); }
+    .result-val.red { color: var(--red); }
+
+    .result-actions {
+      display: flex;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ── Refresh btn ── */
+    .refresh-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
+      transition: color 0.15s;
+    }
+    .refresh-btn:hover { color: var(--accent); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Titlebar -->
+  <div class="titlebar">
+    <div class="titlebar-dot"></div>
+    <span class="titlebar-title">HotSwap</span>
+    <span class="titlebar-status" id="watcherStatus">● Watcher inaktiv</span>
+  </div>
+
+  <div class="content">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+      <!-- Quellen -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div class="section-label">Karten / Volumes</div>
+          <button class="refresh-btn" onclick="refreshVolumes()" title="Neu laden">↺</button>
+        </div>
+        <div class="volumes-list" id="volumesList">
+          <div class="empty-volumes">
+            <div class="empty-icon">💾</div>
+            Keine Karten erkannt
+          </div>
+        </div>
+      </div>
+
+      <!-- Ziel -->
+      <div>
+        <div class="section-label">Zielordner (SSD)</div>
+        <div class="dest-box" id="destBox" onclick="selectDest()">
+          <span style="font-size:18px;">💽</span>
+          <span class="dest-placeholder" id="destText">Ordner wählen …</span>
+        </div>
+        <div style="margin-top:6px; font-family:var(--mono); font-size:9px; color:var(--muted);" id="todayPreview"></div>
+      </div>
+
+      <!-- Auto-Modus -->
+      <div>
+        <div class="section-label">Automatik</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Auto-Backup</div>
+            <div class="toggle-sub">Karte automatisch sichern</div>
+          </div>
+          <div class="toggle" id="autoToggle" onclick="toggleAuto()"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main Panel -->
+    <div class="main-panel">
+
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <div class="big-status">
+          <div class="big-status-label">Status</div>
+          <div class="big-status-value" id="statusValue">Bereit</div>
+        </div>
+        <div class="status-divider"></div>
+        <div class="big-status">
+          <div class="big-status-label">Datum</div>
+          <div class="big-status-value blue" id="todayValue">—</div>
+        </div>
+        <div class="status-divider"></div>
+        <div class="big-status">
+          <div class="big-status-label">Dateien</div>
+          <div class="big-status-value" id="fileCountValue">—</div>
+        </div>
+        <button class="btn-primary" id="startBtn" onclick="startBackup()" disabled>
+          Backup starten
+        </button>
+        <button class="btn-cancel" id="cancelBtn" onclick="cancelBackup()" style="display:none;">
+          ✕ Abbrechen
+        </button>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-area" id="progressArea" style="display:none;">
+        <div class="progress-header">
+          <span class="progress-filename" id="progressFile">—</span>
+          <span class="progress-pct" id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-sub">
+          <span id="progressFiles">0 / 0 Dateien</span>
+          <span id="progressBytes">0 MB / 0 MB</span>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="result-panel" id="resultPanel">
+        <div class="result-title">Backup abgeschlossen</div>
+        <div class="result-row">
+          <span class="result-key">Gesicherte Dateien</span>
+          <span class="result-val green" id="rCopied">—</span>
+        </div>
+        <div class="result-row">
+          <span class="result-key">Fehler</span>
+          <span class="result-val" id="rErrors">—</span>
+        </div>
+        <div class="result-row">
+          <span class="result-key">Zielordner</span>
+          <span class="result-val" id="rDest" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+        </div>
+
+        <!-- Datenmengen-Check -->
+        <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:2px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="result-title">Backup-Prüfung</div>
+            <button class="btn-secondary" onclick="runCheck()" id="checkBtn" style="padding:4px 12px;font-size:10px;">
+              ↺ Prüfen
+            </button>
+          </div>
+
+          <!-- Gesamtordner -->
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.1em;margin-bottom:4px;">GESAMTORDNER</div>
+          <div class="result-row">
+            <span class="result-key">Quelle gesamt</span>
+            <span class="result-val" id="rSrcSize">—</span>
+          </div>
+          <div class="result-row">
+            <span class="result-key">Ziel gesamt</span>
+            <span class="result-val" id="rDestSize">—</span>
+          </div>
+
+          <!-- Nur Mediendateien -->
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.1em;margin:8px 0 4px;">NUR MEDIENDATEIEN</div>
+          <div class="result-row">
+            <span class="result-key">Quelle (MP4, MOV …)</span>
+            <span class="result-val" id="rSrcMedia">—</span>
+          </div>
+          <div class="result-row">
+            <span class="result-key">Ziel (kopierte Medien)</span>
+            <span class="result-val" id="rDestMedia">—</span>
+          </div>
+
+          <!-- Ergebnis -->
+          <div class="result-row" id="checkResultRow" style="display:none;margin-top:6px;">
+            <span class="result-key">Ergebnis</span>
+            <span class="result-val" id="checkResult">—</span>
+          </div>
+        </div>
+
+        <div class="result-actions">
+          <button class="btn-secondary" id="btnInfoWindows" onclick="openInfoWindows()">
+            📂 Quelle & Ziel öffnen
+          </button>
+          <button class="btn-secondary" id="btnReveal" onclick="revealDest()">
+            📂 Im Finder zeigen
+          </button>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="log-area" id="logArea">
+        <div class="log-entry">
+          <span class="log-time" id="initTime"></span>
+          <span class="log-icon">✦</span>
+          <span class="log-text muted">SD Backup Pro gestartet. Karte einlegen oder manuell wählen.</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let selectedVolume = null;
+let destPath = null;
+let autoMode = false;
+let isRunning = false;
+let cancelRequested = false;
+let lastResult = null;
+let appInfo = {};
+
+// ── Init ──
+async function init() {
+  appInfo = await window.api.getAppInfo();
+  updateTodayDisplay();
+  await refreshVolumes();
+  setupListeners();
+
+  document.getElementById('initTime').textContent = nowTime();
+
+  // Auto-Watcher starten
+  await window.api.startWatcher({});
+}
+
+function updateTodayDisplay() {
+  const d = new Date();
+  const str = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  document.getElementById('todayValue').textContent = str;
+  if (destPath) {
+    document.getElementById('todayPreview').textContent = `→ ${destPath}/${str}/`;
+  }
+}
+
+function pad(n) { return String(n).padStart(2,'0'); }
+function nowTime() {
+  const d = new Date();
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function fmtBytes(b) {
+  if (b > 1e9) return (b/1e9).toFixed(2)+' GB';
+  if (b > 1e6) return (b/1e6).toFixed(1)+' MB';
+  return (b/1e3).toFixed(0)+' KB';
+}
+
+// ── Volumes ──
+async function refreshVolumes() {
+  const vols = await window.api.getVolumes();
+  const list = document.getElementById('volumesList');
+
+  if (vols.length === 0) {
+    list.innerHTML = `<div class="empty-volumes"><div class="empty-icon">💾</div>Keine Karten erkannt</div>`;
+    selectedVolume = null;
+    updateStartButton();
+    return;
+  }
+
+  list.innerHTML = '';
+  for (const vol of vols) {
+    const card = document.createElement('div');
+    card.className = 'volume-card' + (selectedVolume?.mountPath === vol.mountPath ? ' selected' : '');
+    card.dataset.path = vol.mountPath;
+    card.innerHTML = `
+      <span class="vol-icon">💳</span>
+      <div class="vol-info">
+        <div class="vol-name">${vol.name}</div>
+        <div class="vol-path">${vol.mountPath}</div>
+      </div>
+      ${selectedVolume?.mountPath === vol.mountPath ? '<span class="vol-check">✓</span>' : ''}
+    `;
+    card.onclick = () => selectVolume(vol, card);
+    list.appendChild(card);
+  }
+}
+
+function selectVolume(vol, cardEl) {
+  selectedVolume = vol;
+  document.querySelectorAll('.volume-card').forEach(c => {
+    c.classList.remove('selected');
+    c.querySelector('.vol-check') && c.querySelector('.vol-check').remove();
+  });
+  cardEl.classList.add('selected');
+  const check = document.createElement('span');
+  check.className = 'vol-check';
+  check.textContent = '✓';
+  cardEl.appendChild(check);
+
+  log('info', `💳`, `Karte ausgewählt: <b>${vol.name}</b> (${vol.mountPath})`);
+  updateStartButton();
+}
+
+// ── Destination ──
+async function selectDest() {
+  const p = await window.api.selectDestination();
+  if (!p) return;
+  destPath = p;
+
+  const box = document.getElementById('destBox');
+  box.classList.add('set');
+
+  const textEl = document.getElementById('destText');
+  textEl.className = 'dest-path';
+  textEl.textContent = p;
+  textEl.title = p;
+
+  updateTodayDisplay();
+  log('info', '💽', `Zielordner gesetzt: ${p}`);
+  updateStartButton();
+}
+
+// ── Auto Toggle ──
+async function toggleAuto() {
+  autoMode = !autoMode;
+  const tog = document.getElementById('autoToggle');
+  tog.classList.toggle('on', autoMode);
+  const statusEl = document.getElementById('watcherStatus');
+
+  if (autoMode) {
+    statusEl.textContent = '● Auto-Modus aktiv';
+    statusEl.className = 'titlebar-status active';
+    log('info', '⚡', 'Auto-Modus aktiviert — Karte wird automatisch gesichert beim Einlegen.');
+  } else {
+    statusEl.textContent = '● Watcher inaktiv';
+    statusEl.className = 'titlebar-status';
+    log('info', '○', 'Auto-Modus deaktiviert.');
+  }
+}
+
+// ── Listeners ──
+function setupListeners() {
+  window.api.onProgress((data) => {
+    const pct = data.totalBytes > 0 ? Math.round((data.bytesCopied / data.totalBytes) * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('progressFile').textContent = data.currentFile;
+    document.getElementById('progressFiles').textContent = `${data.fileIndex} / ${data.totalFiles} Dateien`;
+    document.getElementById('progressBytes').textContent = `${fmtBytes(data.bytesCopied)} / ${fmtBytes(data.totalBytes)}`;
+  });
+
+  window.api.onNewCard(async (data) => {
+    log('info', '🟢', `Neue Karte erkannt: <b>${data.name}</b> (${data.mountPath})`);
+    await refreshVolumes();
+
+    // Pulse-Animation
+    const cards = document.querySelectorAll('.volume-card');
+    for (const c of cards) {
+      if (c.dataset.path === data.mountPath) {
+        c.classList.add('new-pulse');
+        setTimeout(() => c.classList.remove('new-pulse'), 2500);
+      }
+    }
+
+    // Auto-Backup
+    if (autoMode && destPath) {
+      selectedVolume = { name: data.name, mountPath: data.mountPath };
+      // Karte selektieren
+      for (const c of cards) {
+        if (c.dataset.path === data.mountPath) {
+          selectVolume(selectedVolume, c);
+        }
+      }
+      log('info', '⚡', 'Auto-Modus: Starte Backup automatisch …');
+      setTimeout(() => startBackup(), 1500);
+    }
+  });
+
+  window.api.onCardRemoved((data) => {
+    log('warn', '🔴', `Karte entfernt: ${data.mountPath}`);
+    if (selectedVolume?.mountPath === data.mountPath) {
+      selectedVolume = null;
+      updateStartButton();
+    }
+    refreshVolumes();
+  });
+}
+
+// ── Backup ──
+function updateStartButton() {
+  const btn = document.getElementById('startBtn');
+  const cancel = document.getElementById('cancelBtn');
+  btn.disabled = !selectedVolume || !destPath || isRunning;
+  btn.style.display = isRunning ? 'none' : '';
+  cancel.style.display = isRunning ? '' : 'none';
+}
+
+async function cancelBackup() {
+  if (!isRunning) return;
+  cancelRequested = true;
+  await window.api.cancelBackup();
+  log('warn', '✕', 'Abbruch angefordert — laufende Datei wird noch fertig kopiert …');
+  document.getElementById('cancelBtn').disabled = true;
+  document.getElementById('cancelBtn').textContent = '… Abbruch';
+}
+
+async function startBackup() {
+  if (!selectedVolume || !destPath || isRunning) return;
+
+  isRunning = true;
+  cancelRequested = false;
+  document.getElementById('cancelBtn').disabled = false;
+  document.getElementById('cancelBtn').textContent = '✕ Abbrechen';
+  updateStartButton();
+  document.getElementById('resultPanel').classList.remove('show');
+
+  const progressArea = document.getElementById('progressArea');
+  progressArea.style.display = 'flex';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressFill').classList.remove('done');
+
+  document.getElementById('statusValue').textContent = 'Läuft …';
+  document.getElementById('statusValue').className = 'big-status-value yellow';
+
+  log('info', '▶', `Backup gestartet von <b>${selectedVolume.name}</b>`);
+  log('info', '🔍', `Suche Mediendateien auf der Karte …`);
+
+  try {
+    const result = await window.api.startBackup({
+      sourceVolume: selectedVolume.mountPath,
+      destinationBase: destPath,
+    });
+
+    if (!result.success) {
+      log('error', '⚠', result.message);
+      document.getElementById('statusValue').textContent = 'Fehler';
+      document.getElementById('statusValue').className = 'big-status-value red';
+    } else {
+      document.getElementById('progressFill').style.width = '100%';
+      document.getElementById('progressFill').classList.add('done');
+      document.getElementById('progressPct').textContent = '100%';
+
+      document.getElementById('statusValue').textContent = 'Fertig';
+      document.getElementById('statusValue').className = 'big-status-value green';
+      document.getElementById('fileCountValue').textContent = result.copiedCount;
+
+      lastResult = result;
+      showResult(result);
+
+      log('success', '✅', `<b>${result.copiedCount} Dateien</b> gesichert → ${result.destFolder}`);
+      if (result.errorCount > 0) {
+        log('error', '⚠', `${result.errorCount} Fehler aufgetreten.`);
+      }
+      log('info', '📋', 'Klicke "Infofenster öffnen" um Größen zu vergleichen.');
+    }
+  } catch (e) {
+    if (cancelRequested) {
+      document.getElementById('statusValue').textContent = 'Abgebrochen';
+      document.getElementById('statusValue').className = 'big-status-value red';
+      log('warn', '✕', 'Backup wurde abgebrochen.');
+    } else {
+      log('error', '✖', `Fehler: ${e.message}`);
+      document.getElementById('statusValue').textContent = 'Fehler';
+      document.getElementById('statusValue').className = 'big-status-value red';
+    }
+  }
+
+  isRunning = false;
+  cancelRequested = false;
+  updateStartButton();
+}
+
+function showResult(r) {
+  const cardLabel = r.cardIndex > 1 ? ` (Karte ${r.cardIndex} des Tages)` : '';
+  document.getElementById('rCopied').textContent = r.copiedCount + ' Dateien';
+  document.getElementById('rErrors').textContent = r.errorCount === 0 ? '—' : r.errorCount + ' Fehler';
+  document.getElementById('rErrors').className = 'result-val' + (r.errorCount > 0 ? ' red' : ' green');
+  document.getElementById('rDest').textContent = r.destFolder + cardLabel;
+  document.getElementById('rDest').title = r.destFolder;
+  document.getElementById('rSrcSize').textContent = `${r.sourceStats.fileCount} Dateien, ${fmtBytes(r.sourceStats.totalSize)}`;
+  document.getElementById('rDestSize').textContent = `${r.destStats.fileCount} Dateien, ${fmtBytes(r.destStats.totalSize)}`;
+  document.getElementById('resultPanel').classList.add('show');
+}
+
+// ── Info Windows ──
+async function openInfoWindows() {
+  if (!lastResult) return;
+  log('info', '📂', 'Öffne Quelle und Zielordner …');
+  await window.api.openInfoWindow({
+    sourcePath: lastResult.sourceVolume,
+    destPath: lastResult.destFolder,
+  });
+}
+
+async function revealDest() {
+  if (!lastResult) return;
+  await window.api.revealInExplorer(lastResult.destFolder);
+}
+
+// ── Datenmengen-Check ──
+async function runCheck() {
+  if (!lastResult) return;
+
+  const btn = document.getElementById('checkBtn');
+  btn.textContent = '…';
+  btn.disabled = true;
+
+  log('info', '🔍', 'Prüfe Quelle und Ziel …');
+
+  const result = await window.api.checkSizes({
+    sourcePath: lastResult.sourceVolume,
+    destPath: lastResult.destFolder,
+  });
+
+  // Gesamtordner
+  document.getElementById('rSrcSize').textContent =
+    `${result.source.fileCount} Dateien, ${fmtBytes(result.source.totalSize)}`;
+  document.getElementById('rDestSize').textContent =
+    `${result.dest.fileCount} Dateien, ${fmtBytes(result.dest.totalSize)}`;
+
+  // Nur Mediendateien
+  document.getElementById('rSrcMedia').textContent =
+    `${result.sourceMedia.fileCount} Dateien, ${fmtBytes(result.sourceMedia.totalSize)}`;
+  document.getElementById('rDestMedia').textContent =
+    `${result.destMedia.fileCount} Dateien, ${fmtBytes(result.destMedia.totalSize)}`;
+
+  // Ergebnis basiert nur auf Mediendateien-Vergleich
+  const mediaMatch =
+    result.sourceMedia.fileCount === result.destMedia.fileCount &&
+    result.sourceMedia.totalSize === result.destMedia.totalSize;
+
+  const checkRow = document.getElementById('checkResultRow');
+  const checkEl = document.getElementById('checkResult');
+  checkRow.style.display = 'flex';
+
+  if (mediaMatch) {
+    checkEl.textContent = '✓ Alle Mediendateien vollständig gesichert';
+    checkEl.className = 'result-val green';
+    log('success', '✅', `Alle Mediendateien stimmen überein — Backup vollständig.`);
+  } else {
+    const diffFiles = result.sourceMedia.fileCount - result.destMedia.fileCount;
+    const diffBytes = result.sourceMedia.totalSize - result.destMedia.totalSize;
+    checkEl.textContent = `⚠ ${diffFiles} Mediendateien fehlen (${fmtBytes(Math.abs(diffBytes))})`;
+    checkEl.className = 'result-val red';
+    log('error', '⚠', `${diffFiles} Mediendateien fehlen, Differenz ${fmtBytes(Math.abs(diffBytes))}.`);
+  }
+
+  btn.textContent = '↺ Prüfen';
+  btn.disabled = false;
+}
+
+// ── Log ──
+function log(type, icon, html) {
+  const area = document.getElementById('logArea');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+
+  const colorClass = type === 'success' ? 'green'
+    : type === 'error' ? 'red'
+    : type === 'warn' ? 'yellow'
+    : 'text';
+
+  entry.innerHTML = `
+    <span class="log-time">${nowTime()}</span>
+    <span class="log-icon">${icon}</span>
+    <span class="log-text ${colorClass}">${html}</span>
+  `;
+  area.appendChild(entry);
+  area.scrollTop = area.scrollHeight;
+}
+
+// ── Bootstrap ──
+init();
+</script>
+</body>
+</html>
