@@ -389,9 +389,9 @@ ipcMain.handle('eject-volume', async (event, volumePath) => {
         }
       });
     } else if (platform === 'win32') {
-      // Windows: PowerShell Eject
-      const dl = volumePath.slice(0, 2);
-      exec('powershell -command "(New-Object -comObject Shell.Application).NameSpace(17).ParseName(' + JSON.stringify(dl) + ').InvokeVerb(\'Eject\')"', (err) => {
+      // Windows: mountvol zum sicheren Aushaengen
+      const dl = volumePath.slice(0, 2).toUpperCase();
+      exec('mountvol ' + dl + ' /p', (err) => {
         if (err) {
           resolve({ success: false, error: err.message });
         } else {
