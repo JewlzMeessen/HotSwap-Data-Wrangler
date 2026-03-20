@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   revealInExplorer: (folderPath) => ipcRenderer.invoke('reveal-in-explorer', folderPath),
   checkSizes: (args) => ipcRenderer.invoke('check-sizes', args),
   cancelBackup: () => ipcRenderer.invoke('cancel-backup'),
+  ejectVolume: (volumePath) => ipcRenderer.invoke('eject-volume', volumePath),
   startWatcher: (config) => ipcRenderer.invoke('start-watcher', config),
   stopWatcher: () => ipcRenderer.invoke('stop-watcher'),
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),

@@ -366,6 +366,45 @@ ipcMain.handle('cancel-backup', () => {
   return true;
 });
 
+// Karte auswerfen
+ipcMain.handle('eject-volume', async (event, volumePath) => {
+  const { exec } = require('child_process');
+  const platform = process.platform;
+
+  return new Promise((resolve) => {
+    if (platform === 'darwin') {
+      // macOS: diskutil unmount
+      exec(`diskutil unmount "${volumePath}"`, (err, stdout, stderr) => {
+        if (err) {
+          // Fallback: eject
+          exec(`diskutil eject "${volumePath}"`, (err2) => {
+            if (err2) {
+              resolve({ success: false, error: err2.message });
+            } else {
+              resolve({ success: true });
+            }
+          });
+        } else {
+          resolve({ success: true });
+        }
+      });
+    } else if (platform === 'win32') {
+      // Windows: PowerShell mit WMI
+      const driveLetter = volumePath.replace('\', '').replace('/', '');
+      const cmd = `powershell -command "(New-Object -comObject Shell.Application).NameSpace(17).ParseName('${driveLetter}').InvokeVerb('Eject')"`;
+      exec(cmd, (err) => {
+        if (err) {
+          resolve({ success: false, error: err.message });
+        } else {
+          resolve({ success: true });
+        }
+      });
+    } else {
+      resolve({ success: false, error: 'Nicht unterstütztes Betriebssystem' });
+    }
+  });
+});
+
 // Datenmengen-Check: Gesamt + nur Mediendateien
 ipcMain.handle('check-sizes', (event, { sourcePath, destPath }) => {
   return {

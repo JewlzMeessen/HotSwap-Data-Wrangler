@@ -612,6 +612,9 @@
           <button class="btn-secondary" id="btnReveal" onclick="revealDest()">
             📂 Im Finder zeigen
           </button>
+          <button class="btn-secondary" id="btnEject" onclick="ejectCard()">
+            ⏏ Karte auswerfen
+          </button>
         </div>
       </div>
 
@@ -911,6 +914,27 @@ async function openInfoWindows() {
 async function revealDest() {
   if (!lastResult) return;
   await window.api.revealInExplorer(lastResult.destFolder);
+}
+
+// ── Karte auswerfen ──
+async function ejectCard() {
+  if (!lastResult) return;
+  const btn = document.getElementById('btnEject');
+  btn.textContent = '… wird ausgeworfen';
+  btn.disabled = true;
+
+  const result = await window.api.ejectVolume(lastResult.sourceVolume);
+
+  if (result.success) {
+    log('success', '⏏', 'Karte wurde sicher ausgeworfen.');
+    btn.textContent = '✓ Ausgeworfen';
+    // Volumeliste aktualisieren
+    setTimeout(() => refreshVolumes(), 1000);
+  } else {
+    log('error', '⚠', `Auswerfen fehlgeschlagen: ${result.error}`);
+    btn.textContent = '⏏ Karte auswerfen';
+    btn.disabled = false;
+  }
 }
 
 // ── Datenmengen-Check ──
