@@ -389,10 +389,9 @@ ipcMain.handle('eject-volume', async (event, volumePath) => {
         }
       });
     } else if (platform === 'win32') {
-      // Windows: PowerShell mit WMI
-            const driveLetter = volumePath.slice(0, 2);
-      const cmd = 'powershell -command "(New-Object -comObject Shell.Application).NameSpace(17).ParseName(\"' + driveLetter + '\").InvokeVerb(\"Eject\")';
-      exec(cmd, (err) => {
+      // Windows: PowerShell Eject
+      const dl = volumePath.slice(0, 2);
+      exec('powershell -command "(New-Object -comObject Shell.Application).NameSpace(17).ParseName(' + JSON.stringify(dl) + ').InvokeVerb(\'Eject\')"', (err) => {
         if (err) {
           resolve({ success: false, error: err.message });
         } else {
