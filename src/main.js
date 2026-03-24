@@ -60,16 +60,55 @@ function getTodayFolder() {
 
 function getMediaExtensions() {
   return [
-    // Video
-    '.mp4', '.mov', '.mxf', '.r3d', '.braw', '.ari',
-    '.mts', '.m2ts', '.avi', '.mkv', '.wmv', '.cine',
-    // Foto
-    '.arw', '.cr2', '.cr3', '.nef', '.dng', '.raf',
-    '.raw', '.rw2', '.orf', '.jpg', '.jpeg', '.png',
-    '.heic', '.tiff', '.tif',
+    // Video — Cinema & Professional
+    '.mp4', '.mov', '.mxf', '.avi', '.mkv', '.wmv',
+    '.m4v', '.mpg', '.mpeg', '.m2v', '.ts', '.mts', '.m2ts',
+    // RED
+    '.r3d',
+    // Blackmagic
+    '.braw',
+    // ARRI
+    '.ari', '.arx', '.mxf',
+    // Canon
+    '.crm',                          // Canon RAW Movie (Cinema EOS)
+    // Sony
+    '.mxf', '.mp4',
+    // Insta360
+    '.insv', '.insp',
+    // GoPro
+    '.lrv', '.thm',
+    // Andere Cinema/Log Formate
+    '.cine', '.cin', '.dpx', '.exr',
+    '.webm', '.ogv', '.flv', '.f4v',
+    // Foto — Canon
+    '.cr2', '.cr3', '.crw',
+    // Foto — Sony
+    '.arw', '.srf', '.sr2',
+    // Foto — Nikon
+    '.nef', '.nrw',
+    // Foto — Fujifilm
+    '.raf',
+    // Foto — Panasonic
+    '.rw2',
+    // Foto — Olympus / OM System
+    '.orf', '.ori',
+    // Foto — Leica / Hasselblad / Phase One
+    '.rwl', '.3fr', '.fff', '.iiq',
+    // Foto — DJI / Drone
+    '.dng',
+    // Foto — Universal RAW
+    '.raw', '.nef', '.pef', '.srw', '.x3f',
+    // Foto — Standard
+    '.jpg', '.jpeg', '.png', '.heic', '.heif',
+    '.tiff', '.tif', '.bmp', '.webp',
+    // Foto — Insta360
+    '.insp',
     // Audio
-    '.wav', '.aiff', '.mp3',
-  ];
+    '.wav', '.aiff', '.aif', '.mp3', '.aac',
+    '.flac', '.ogg', '.m4a', '.opus',
+    // Projektdateien / Sidecar (optional aber üblich)
+    '.xml', '.srt', '.lut', '.cube',
+  ].filter((v, i, a) => a.indexOf(v) === i); // Duplikate entfernen
 }
 
 // Alle verbundenen Wechselmedien ermitteln
